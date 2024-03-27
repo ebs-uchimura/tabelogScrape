@@ -20,7 +20,7 @@
       <button class="button-g button-wide" value="shop" onclick="transfer('shop_page');">店舗情報取得画面</button>
     </div>
     <div class="operation_area">
-      <button class="button-g button-8 button-wide" value="exit" onclick="transfer('exit_page');">終了</button>
+      <button class="button-g button-4 button-wide" value="exit" onclick="exitApp();">終了</button>
     </div>
   </div>
   <footer>
@@ -33,6 +33,18 @@
       try {
         // 配信ページ遷移
         window.api.send("page", channel);
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    }
+
+    // アプリ終了
+    const exitApp = () => {
+      try {
+        // アプリ終了
+        window.api.send("exit");
 
       } catch (e) {
         // エラー処理

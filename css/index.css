@@ -103,16 +103,14 @@ footer {
   width: 100px;
 }
 
-.wrapper {
-  margin-top: 30px;
-}
-
 .operation_area {
   padding: 20px 0;
 }
 
 .operation_area div {
   margin: 10px 0;
+  font-size: 0.8rem;
+  font-weight: bold;
 }
 
 .button-container {

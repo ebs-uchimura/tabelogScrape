@@ -3,7 +3,7 @@
  *
  * class：Scrape
  * function：scraping site
- * updated: 2024/03/8
+ * updated: 2024/03/26
  **/
 
 // constants
@@ -27,6 +27,7 @@ const DEF_USER_AGENT: string =
 // define modules
 import * as fs from "fs"; // fs
 import * as path from "path"; // path
+import { setTimeout } from 'node:timers/promises'; // wait for seconds
 import puppeteer from "puppeteer"; // Puppeteer for scraping
 
 //* Interfaces
@@ -44,11 +45,14 @@ export class Scrape {
   static page: any; // static page
 
   private _result: boolean; // scrape result
+  private _height: number; // body height
 
   // constractor
   constructor() {
     // result
     this._result = false;
+    // height
+    this._height = 0;
   }
 
   // initialize
@@ -56,7 +60,7 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         const puppOptions: puppOption = {
-          headless: true, // no display mode
+          headless: false, // no display mode
           executablePath: getChromePath(), // chrome.exe path
           ignoreDefaultArgs: [DISABLE_EXTENSIONS], // ignore extensions
           args: [
@@ -86,10 +90,13 @@ export class Scrape {
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 1);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`1: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -102,10 +109,13 @@ export class Scrape {
         resolve(await Scrape.page.title);
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 2);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`2: ${e.message}`);
+          // reject
+          reject(e.message);
+        }
       }
     });
   }
@@ -114,16 +124,19 @@ export class Scrape {
   pressEnter(): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // goto target page
+        // press enter key
         await Scrape.page.keyboard.press("Enter");
         // resolved
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 3);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`3: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -134,14 +147,23 @@ export class Scrape {
       try {
         // goto target page
         await Scrape.page.goto(targetPage);
+        // get page height
+        const height = await Scrape.page.evaluate(() => {
+          return document.body.scrollHeight;
+        });
+        // body height
+        this._height = height;
         // resolved
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 4);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`4: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -151,15 +173,18 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         // click target element
-        await Scrape.page.click(elem);
+        await Scrape.page.$$eval(elem, (elements: any) => elements[0].click());
         // resolved
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 5);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`5: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -174,10 +199,13 @@ export class Scrape {
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 4);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`6: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -186,16 +214,19 @@ export class Scrape {
   doClear(elem: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // type element on specified value
+        // clear the textbox
         await Scrape.page.$eval(elem, (element: any) => (element.value = ""));
         // resolved
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 4);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`7: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -204,16 +235,19 @@ export class Scrape {
   doSelect(elem: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // select element
+        // select dropdown element
         await Scrape.page.select(elem);
         // resolved
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 5);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`8: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -222,26 +256,51 @@ export class Scrape {
   doScreenshot(path: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // take screenshot
+        // take screenshot of window
         await Scrape.page.screenshot({ path: path });
         // resolved
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 6);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`9: ${e.message}`);
+          // reject
+          reject();
+        }
+      }
+    });
+  }
+
+  // mouse wheel
+  mouseWheel(): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log(this._height);
+        // mouse wheel to bottom
+        await Scrape.page.mouse.wheel({ deltaY: this._height - 200 });
+        // resolved
+        resolve();
+
+      } catch (e: unknown) {
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`10: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
 
   // eval
-  doSingleEval(selector: string, property: string): Promise<any> {
+  doSingleEval(selector: string, property: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
       try {
         // target item
-        const exists = await Scrape.page.$eval(selector, () => true).catch(() => false);
+        const exists: boolean = await Scrape.page.$eval(selector, () => true).catch(() => false);
 
         // no result
         if (!exists) {
@@ -249,9 +308,9 @@ export class Scrape {
           reject("error");
 
         } else {
-
+          // target value
           const item: any = await Scrape.page.$(selector);
-          const result = await Scrape.page.$(selector).then((res: any) => !!res);
+
           // if not null
           if (item !== null) {
             // got data
@@ -274,9 +333,13 @@ export class Scrape {
         }
 
       } catch (e: unknown) {
-        // reject
-        console.log(e);
-        reject(e);
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`11: ${e.message}`);
+          // reject
+          reject(e.message);
+        }
       }
     });
   }
@@ -290,8 +353,9 @@ export class Scrape {
         // target list
         const list: any = await Scrape.page.$$(selector);
         // result
-        const result = await Scrape.page.$(selector).then((res: any) => !!res);
+        const result: boolean = await Scrape.page.$(selector).then((res: any) => !!res);
 
+        // if element exists
         if (result) {
           // loop in list
           for (const ls of list) {
@@ -303,10 +367,33 @@ export class Scrape {
         }
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 8);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`12: ${e.message}`);
+          // reject
+          reject(e.message);
+        }
+      }
+    });
+  }
+
+  // waitSelector
+  doWaitFor(time: number): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // wait for time
+        await setTimeout(time);
+        resolve();
+
+      } catch (e: unknown) {
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`13: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -316,9 +403,9 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         // target item
-        const exists = await Scrape.page.$eval(elem, () => true).catch(() => false);
+        const exists: boolean = await Scrape.page.$eval(elem, () => true).catch(() => false);
 
-        // element exists
+        // if element exists
         if (exists) {
           // wait for loading selector
           await Scrape.page.waitForSelector(elem, { timeout: time });
@@ -327,7 +414,33 @@ export class Scrape {
         }
 
       } catch (e: unknown) {
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`14: ${e.message}`);
+          // reject
+          reject();
+        }
+      }
+    });
+  }
+
+  // wait for navigaion
+  doWaitForNav(time: number): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // wait for time
+        await Scrape.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: time });
+        resolve();
+
+      } catch (e: unknown) {
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`15: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -337,12 +450,18 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         // target item
-        const exists = await Scrape.page.$eval(elem, () => true).catch(() => false);
+        const exists: boolean = await Scrape.page.$eval(elem, () => true).catch(() => false);
         // return true/false
         resolve(exists);
 
       } catch (e: unknown) {
-        reject(false);
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`16: ${e.message}`);
+          // reject
+          reject(false);
+        }
       }
     });
   }
@@ -357,10 +476,13 @@ export class Scrape {
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 12);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`14: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -375,10 +497,13 @@ export class Scrape {
         resolve();
 
       } catch (e: unknown) {
-        // error
-        outErrorMsg(e, 12);
-        // reject
-        reject();
+        // if type is error
+        if (e instanceof Error) {
+          // error
+          console.log(`15: ${e.message}`);
+          // reject
+          reject();
+        }
       }
     });
   }
@@ -394,15 +519,6 @@ export class Scrape {
     return this._result;
   }
 }
-
-// outuput error
-const outErrorMsg = (e: unknown, no: number): void => {
-  // if type is error
-  if (e instanceof Error) {
-    // error
-    console.log(`${no}: ${e.message}`);
-  }
-};
 
 // get chrome absolute path
 const getChromePath = (): string => {
@@ -424,7 +540,7 @@ const getChromePath = (): string => {
     // error
   } else {
     // error logging
-    console.log('8: no chrome path error');
+    console.log('16: no chrome path error');
     return '';
   }
 }

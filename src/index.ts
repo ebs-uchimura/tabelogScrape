@@ -9,7 +9,7 @@ import { BrowserWindow, app, ipcMain, dialog, Tray, Menu, nativeImage } from 'el
 import * as path from 'path'; // path
 import { promises } from "fs"; // fs
 import iconv from 'iconv-lite'; // Text converter
-import { Scrape } from './class/myScraper0311el'; // scraper
+import { Scrape } from './class/myScraper0326el'; // scraper
 import ELLogger from './class/MyLogger0301el'; // logger
 import { setTimeout } from 'node:timers/promises'; // sleep
 import { parse } from 'csv-parse/sync'; // parse
@@ -126,7 +126,7 @@ const tabeLogSelectors: any = {
     店舗電話2: tabeLogTelephone2Selector,
 };
 
-// OSがWindowsなら"USERPROFILE", Mac, Linuxは"HOME"を参照
+// デスクトップパス
 const dir_home = process.env[process.platform == "win32" ? "USERPROFILE" : "HOME"] ?? '';
 const dir_desktop = path.join(dir_home, "Desktop");
 
@@ -137,6 +137,10 @@ const dir_desktop = path.join(dir_home, "Desktop");
 let mainWindow: Electron.BrowserWindow;
 // 起動確認フラグ
 let isQuiting: boolean;
+// 最終URL配列
+let finalCsvArray: any = [];
+// 最終店舗配列
+let finalResultArray: any = [];
 
 // ウィンドウ作成
 const createWindow = (): void => {
@@ -176,8 +180,6 @@ const createWindow = (): void => {
             if (!isQuiting) {
                 // apple以外
                 if (process.platform !== 'darwin') {
-                    // 終了
-                    //app.quit();
                     // falseを返す
                     event.returnValue = false;
                 }
@@ -243,6 +245,7 @@ app.on('activate', () => {
 
 // 閉じるボタン
 app.on('before-quit', () => {
+    logger.info('ipc: quit mode');
     // 閉じるフラグ
     isQuiting = true;
 });
@@ -258,7 +261,7 @@ app.on('window-all-closed', () => {
  IPC
 */
 /* ページ表示 */
-ipcMain.on('page', async (event, arg) => {
+ipcMain.on('page', async (_, arg) => {
     try {
         logger.info('ipc: page mode');
         // 遷移先
@@ -300,7 +303,6 @@ ipcMain.on('page', async (event, arg) => {
                 // 遷移先
                 url = '';
         }
-
         // ページ遷移
         await mainWindow.loadFile(path.join(__dirname, url));
 
@@ -313,14 +315,12 @@ ipcMain.on('page', async (event, arg) => {
     }
 });
 
-
 // CSV取得
 ipcMain.on('csv', async (event, _) => {
     try {
         logger.info('ipc: csv mode');
         // CSVデータ取得
         const result: any = await getCsvData();
-
         // 配信ユーザ一覧返し
         event.sender.send('shopinfoCsvlist', result);
 
@@ -345,11 +345,8 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
         let failCounter: number = 0;
         // エラー配列
         let errorResultArray: any[] = [];
-        // 最終配列
-        let finalResultArray: string[] = [];
         // タグ文字列
         const regex: RegExp = new RegExp('(<([^>]+)>)', 'gi');
-
         // スクレイパー初期化
         await puppScraper.init();
         // 成功進捗更新
@@ -397,6 +394,8 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
                 // ウェイト
                 await setTimeout(2 * 1000);
                 logger.debug(`app: scraping ${url}`);
+                // 対象URL返し
+                event.sender.send('statusUpdate', url);
 
                 // URLループ
                 Object.keys(tabeLogSelectors).forEach(async (key: any) => {
@@ -409,7 +408,6 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
 
                     // 空ならエラー
                     if (!isEmpty) {
-
                         // タグあり
                         if (regex.test(result)) {
                             tmpResult = result.replace(/(<([^>]+)>)/gi, '');
@@ -419,18 +417,17 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
                         }
                         // オブジェクトセット
                         myShopObj[`${key}`] = tmpResult;
-                        // 配列に格納
-                        finalResultArray.push(myShopObj);
+
                         // 成功数
                         successCounter++;
 
                     } else {
                         // 失敗
                         failCounter++;
-                        // 配信ユーザ一覧返し
-                        event.sender.send('statusUpdate', 'error');
                     }
                 });
+                // 配列に格納
+                finalResultArray.push(myShopObj);
 
             } catch (err) {
                 // エラー型
@@ -472,7 +469,6 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
 
         // ウィンドウを閉じる
         await puppScraper.doClose();
-
         // 終了メッセージ
         showmessage('info', '取得が終わりました');
 
@@ -495,8 +491,6 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
         let successCounter: number = 0;
         // 失敗数
         let failCounter: number = 0;
-        // 最終配列
-        let finalResultArray: string[][] = [];
 
         // スクレイパー初期化
         await puppScraper.init();
@@ -544,12 +538,12 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
         for (let url of urls) {
             try {
                 // トップへ
-                await puppScraper.doGo(url);
                 logger.debug(`app: scraping ${url}`);
+                await puppScraper.doGo(url);
                 // 結果収集
                 const result: string[] = await doScrapeUrl(tabeLogUrlSelector);
                 // 配列に格納
-                finalResultArray.push(result);
+                finalCsvArray.push(result);
                 logger.debug(`app: scraping ${url} success`);
                 // 成功
                 successCounter = successCounter + 20;
@@ -564,6 +558,8 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
                 }
 
             } finally {
+                // 対象URL返し
+                event.sender.send('statusUpdate', url);
                 // 成功進捗更新
                 event.sender.send('success', successCounter);
                 // 失敗進捗更新
@@ -572,9 +568,9 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
         }
 
         // CSVファイル名
-        const nowtime: string = `${dir_desktop}\\${(new Date).toISOString().replace(/[^\d]/g, "").slice(0, 14)}.csv`;
+        const nowtime: string = `${dir_desktop}\\${(new Date).toISOString().replace(/[^\d]/g, "").slice(0, 14)}_url.csv`;
         // csvdata
-        const csvData = stringify(finalResultArray);
+        const csvData = stringify(finalCsvArray);
         // 書き出し
         await writeFile(nowtime, iconv.encode(csvData, 'shift_jis'));
 
@@ -596,14 +592,51 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
 });
 
 // スクレイピング停止
-ipcMain.on('pauseurl', async (event: any, arg: any) => {
+ipcMain.on('pause', async (_: any, arg: any) => {
     try {
         logger.info('ipc: pause mode');
-        // ウィンドウを閉じる
-        await puppScraper.doClose();
+        // CSVパス
+        let targetpath: string = '';
+        // CSVデータ
+        let targetCsvArray: any = [];
+        // 質問項目
+        const options: Electron.MessageBoxSyncOptions = {
+            type: 'question',
+            title: '質問',
+            message: '停止',
+            detail: '停止してよろしいですか？これまでのデータはCSVに書き出されます。',
+            buttons: ['はい', 'いいえ'],
+            cancelId: -1, // Escで閉じられたときの戻り値
+        }
+        // 選んだ選択肢
+        const selected: number = dialog.showMessageBoxSync(options);
 
-        // 終了メッセージ
-        showmessage('info', '処理を中断しました');
+        // はいを選択
+        if (selected == 0) {
+            // 終了メッセージ
+            showmessage('info', '処理を中断しました');
+
+            // 現在時刻
+            const nowtime: string = `${dir_desktop}\\${(new Date).toISOString().replace(/[^\d]/g, '').slice(0, 14)}`;
+
+            if (arg == 'url') {
+                // 対象CSV
+                targetCsvArray = finalCsvArray;
+                // 開店CSVファイル名
+                targetpath = `${nowtime}_url.csv`;
+
+            } else if (arg == 'shop') {
+                // 対象CSV
+                targetCsvArray = finalResultArray;
+                // 開店CSVファイル名
+                targetpath = `${nowtime}.csv`;
+            }
+            // CSV作成
+            await makeCsvData(targetCsvArray, targetpath);
+
+        } else {
+            return false;
+        }
 
     } catch (e: unknown) {
         // エラー型
@@ -615,46 +648,11 @@ ipcMain.on('pauseurl', async (event: any, arg: any) => {
 });
 
 // スクレイピング停止
-ipcMain.on('exiturl', async (event: any, arg: any) => {
+ipcMain.on('exit', async () => {
     try {
         logger.info('ipc: exit mode');
-        // 閉じるs
-        app.quit();
-
-    } catch (e: unknown) {
-        // エラー型
-        if (e instanceof Error) {
-            // エラー処理
-            logger.error(e.message);
-        }
-    }
-});
-
-// スクレイピング停止
-ipcMain.on('pause', async (event: any, arg: any) => {
-    try {
-        logger.info('ipc: pause mode');
-        // ウィンドウを閉じる
-        await puppScraper.doClose();
-
-        // 終了メッセージ
-        showmessage('info', '処理を中断しました');
-
-    } catch (e: unknown) {
-        // エラー型
-        if (e instanceof Error) {
-            // エラー処理
-            logger.error(e.message);
-        }
-    }
-});
-
-// スクレイピング停止
-ipcMain.on('exit', async (event: any, arg: any) => {
-    try {
-        logger.info('ipc: exit mode');
-        // 閉じる
-        app.quit();
+        // アプリ終了
+        await exitApp();
 
     } catch (e: unknown) {
         // エラー型
@@ -784,6 +782,34 @@ const getCsvData = (): Promise<any> => {
     });
 }
 
+// CSV抽出
+const makeCsvData = (arr: any[], filename: string): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            logger.info('func: makeCsvData mode');
+            // CSVファイル名
+            const nowtime: string = `${dir_desktop}\\${(new Date).toISOString().replace(/[^\d]/g, "").slice(0, 14)}_url.csv`;
+            // csvdata
+            const csvData = stringify(finalResultArray);
+            // 書き出し
+            await writeFile(nowtime, iconv.encode(csvData, 'shift_jis'));
+            logger.debug('CSV writing finished');
+            // ウィンドウを閉じる
+            await puppScraper.doClose();
+            // 完了
+            resolve();
+
+        } catch (e: unknown) {
+            // エラー型
+            if (e instanceof Error) {
+                // エラー
+                logger.error(e.message);
+                reject();
+            }
+        }
+    });
+}
+
 // メッセージ表示
 const showmessage = async (type: string, message: string): Promise<void> => {
     try {
@@ -834,4 +860,42 @@ const showmessage = async (type: string, message: string): Promise<void> => {
             logger.error(e.message);
         }
     }
+}
+
+// アプリ終了
+const exitApp = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        try {
+            logger.info('ipc: exit mode');
+            // 質問項目
+            const options: Electron.MessageBoxSyncOptions = {
+                type: 'question',
+                title: '質問',
+                message: '終了',
+                detail: '終了してよろしいですか？これまでのデータは破棄されます。',
+                buttons: ['はい', 'いいえ'],
+                cancelId: -1, // Escで閉じられたときの戻り値
+            }
+            // 選んだ選択肢
+            const selected: number = dialog.showMessageBoxSync(options);
+
+            // はいを選択
+            if (selected == 0) {
+                // 閉じる
+                app.quit();
+                // 閉じる
+                resolve();
+
+            } else {
+                reject();
+            }
+
+        } catch (e: unknown) {
+            // エラー型
+            if (e instanceof Error) {
+                // エラー
+                logger.error(e.message);
+            }
+        }
+    });
 }

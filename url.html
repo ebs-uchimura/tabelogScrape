@@ -13,20 +13,25 @@
   <div class="wrapper">
     <div class="button_area">
       <div class="operation_area">
-        <div>対象URL<br><input type="text" id="targeturl" class="middle" value=""></div>
-        <button class="button-g button-2 button-wide" onclick="gotoScrape();">スクレイピング開始</button><br><br>
-        <button class="button-g button-wide" onclick="pauseScrape();">中断</button>
+        <h3>対象URL</h3>
+        <div><input type="text" id="targeturl" class="middle" value=""></div>
+        <div><button class="button-g button-2 button-wide" onclick="gotoScrape();">スクレイピング開始</button></div>
+        <div><button class="button-g button-wide" onclick="pauseScrape();">スクレイピング中断</button></div>
       </div>
       <div class="progressarea">
         <div>成功:<span id="success"></span>/<span id="successtotal"></span></div>
         <div>失敗:<span id="fail"></span>/<span id="failtotal"></span></div>
       </div>
       <div class="operation_area">
+        <h3>ステータス</h3>
+        <div id="scrapingstatus"></div>
+      </div>
+      <div class="operation_area">
         <button type="button" id="topbutton" class="button-g button-6 button-wide" role="button"
           onclick="transfer('top_page');">トップへ戻る</button>
       </div>
       <div class="operation_area">
-        <button class="button-g button-8 button-wide" value="exit" onclick="exitApp();">終了</button>
+        <button class="button-g button-4 button-wide" value="exit" onclick="exitApp();">終了</button>
       </div>
     </div>
   </div>
@@ -36,15 +41,17 @@
   </footer>
 
   <script>
+    // ステータス
+    const scrapingstatusDom = document.getElementById('scrapingstatus');
     // 対象URL
     const targetUrlDom = document.getElementById('targeturl');
-    // 進捗表示
+    // 成功進捗表示
     const successDom = document.getElementById('success');
-    // 進捗表示
+    // 失敗進捗表示
     const failDom = document.getElementById('fail');
-    // 合計表示
+    // 成功合計表示
     const successtotalDom = document.getElementById('successtotal');
-    // 合計表示
+    // 失敗合計表示
     const failtotalDom = document.getElementById('failtotal');
 
     // 合計数
@@ -65,6 +72,19 @@
     window.api.on('fail', arg => {
       // 失敗数
       failDom.innerHTML = arg;
+    });
+
+    // ステータス更新
+    window.api.on("statusUpdate", arg => {
+      try {
+        // ステータス表示
+        scrapingstatusDom.innerHTML = `
+          スクレイピング中: ${arg}`;
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
     });
 
     // スクレイピング開始
@@ -88,7 +108,7 @@
     const pauseScrape = () => {
       try {
         // スクレイピング
-        window.api.send("pause", '');
+        window.api.send("pause", "url");
 
       } catch (e) {
         // エラー処理
@@ -100,7 +120,7 @@
     const exitApp = () => {
       try {
         // アプリ終了
-        window.api.send("exit", '');
+        window.api.send("exit");
 
       } catch (e) {
         // エラー処理

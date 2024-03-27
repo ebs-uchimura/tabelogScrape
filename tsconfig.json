@@ -12,11 +12,6 @@
     /* Completeness */
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    "paths": {
-      "*": [
-        "../@types/*"
-      ]
-    }
   },
   "include": [
     "."
