@@ -417,15 +417,10 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
                         }
                         // オブジェクトセット
                         myShopObj[`${key}`] = tmpResult;
-
-                        // 成功数
-                        successCounter++;
-
-                    } else {
-                        // 失敗
-                        failCounter++;
                     }
                 });
+                // 成功数
+                successCounter++;
                 // 配列に格納
                 finalResultArray.push(myShopObj);
 
@@ -485,8 +480,8 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
 ipcMain.on('scrapeurl', async (event: any, arg: any) => {
     try {
         logger.info('ipc: scrape mode');
-        // 合計数
-        let totalCounter: number = 0;
+        // 確定合計数
+        let finalTotalCounter: number = 0;
         // 成功数
         let successCounter: number = 0;
         // 失敗数
@@ -513,26 +508,29 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
                 'innerHTML'
             );
             // 合計数
-            totalCounter = Number(tmptotal[2].replace(/(<([^>]+)>)/gi, ''));
-            logger.info(`total is ${totalCounter}`);
+            const totalCounter = Number(tmptotal[2].replace(/(<([^>]+)>)/gi, '')) / 20;
+            logger.info(`total is ${totalCounter} pages`);
 
             // 上限超え
-            if (totalCounter > 1200) {
+            if (totalCounter > 60) {
                 // 終了メッセージ
-                showmessage('info', '1200件を超えています。');
-                totalCounter = 1200;
+                //showmessage('info', '1200件を超えています。');
+                finalTotalCounter = 60;
+
+            } else {
+                finalTotalCounter = Math.floor(totalCounter);
             }
-            logger.info(`total is ${totalCounter}`);
+            logger.info(`final total is ${finalTotalCounter}`);
 
             // isNaNでない
-            if (!isNaN(totalCounter)) {
+            if (!isNaN(finalTotalCounter)) {
                 // 合計数を送る
-                event.sender.send('total', tmptotal[2].replace(/(<([^>]+)>)/gi, ''));
+                event.sender.send('total', finalTotalCounter);
             }
         }
 
         // get url list
-        const urls: string[] = [...Array(Math.ceil(totalCounter / 20) + 1).keys()].map(i => `${arg}/${++i}`);
+        const urls: string[] = [...Array(Math.ceil(finalTotalCounter)).keys()].map(i => `${arg}/${++i}`);
 
         // 収集ループ
         for (let url of urls) {
@@ -546,7 +544,7 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
                 finalCsvArray.push(result);
                 logger.debug(`app: scraping ${url} success`);
                 // 成功
-                successCounter = successCounter + 20;
+                successCounter++;
 
             } catch (err) {
                 // エラー型
@@ -554,7 +552,7 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
                     // エラー処理
                     logger.error(err.message);
                     // 失敗
-                    failCounter = failCounter + 20;
+                    failCounter = failCounter++;
                 }
 
             } finally {
@@ -576,11 +574,11 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
 
         logger.debug('CSV writing finished');
 
-        // ウィンドウを閉じる
-        await puppScraper.doClose();
-
         // 終了メッセージ
         showmessage('info', '取得が終わりました');
+
+        // ウィンドウを閉じる
+        await puppScraper.doClose();
 
     } catch (e: unknown) {
         // エラー型
