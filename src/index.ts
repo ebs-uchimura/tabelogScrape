@@ -345,6 +345,8 @@ ipcMain.on('scrape', async (event: any, arg: any) => {
         let failCounter: number = 0;
         // エラー配列
         let errorResultArray: any[] = [];
+        // 配列初期化
+        finalResultArray = [];
         // タグ文字列
         const regex: RegExp = new RegExp('(<([^>]+)>)', 'gi');
         // スクレイパー初期化
@@ -486,6 +488,8 @@ ipcMain.on('scrapeurl', async (event: any, arg: any) => {
         let successCounter: number = 0;
         // 失敗数
         let failCounter: number = 0;
+        // 配列初期化
+        finalCsvArray = [];
 
         // スクレイパー初期化
         await puppScraper.init();
